@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inventory Control System</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z M3 8l9 5 9-5 M12 13v8"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24"><path d="M2 6h12v10H2z M14 9h4l4 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+<symbol id="i-in" viewBox="0 0 24 24"><path d="M19 5L5 19 M5 9v10h10"/></symbol>
+<symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 13H6z M9 8a3 3 0 016 0"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4 M4 20h16 M9 16v-5 M14 16V8 M19 16v-8"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6 M17 5a3.5 3.5 0 010 7 M22 20c0-3-2-5-4-5.5"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10 M15 9.5c-1-1-5-1.5-5 .8 0 2.5 5 1.5 5 4 0 2.3-4 1.8-5 .7"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z M12 10v5 M12 18v.5"/></symbol>
+<symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4h4v16h-4"/><path d="M3 12h12 M12 8l4 4-4 4"/></symbol>
+</defs></svg><div class="login" id="login"><div class="lp"><div class="logo"><i><svg class="ic"><use href="#i-box"/></svg></i><div><b>stockroom.</b><small>Control desk</small></div></div>
+<div><h1>Inventory Control System</h1><p>Track products, suppliers, purchases and sales in one place, with tax calculated on every sale.</p></div>
+<small class="cr">CSE212 (B2) Database Systems Lab | University of Asia Pacific</small></div>
+<div class="lf"><form id="lf"><div><p class="eyebrow">Sign in</p><h2>Welcome back.</h2></div>
+<label>Username<input name="username" autocomplete="username" required></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+<p id="lerr" class="err" role="alert"></p><button class="cta">Sign in</button>
+<div class="demo"><small>Demo accounts (click to fill)</small>
+<button type="button" data-a="fill" data-k="zubaer:admin123">Admin: zubaer / admin123</button>
+<button type="button" data-a="fill" data-k="nasim:sales123">Sales staff: nasim / sales123</button>
+<button type="button" data-a="fill" data-k="dipraj:stock123">Inventory clerk: dipraj / stock123</button></div></form></div></div>
+<div class="shell"><aside class="side">
+<div class="logo"><i><svg class="ic"><use href="#i-box"/></svg></i><div><b>stockroom.</b><small>Control desk</small></div></div>
+<div class="links">
+<p class="g g0">Your business</p><div class="grp"><p class="g">Workspace</p><a href="#home"><svg class="ic"><use href="#i-grid"/></svg>Overview</a></div>
+<div class="grp"><p class="g">Inventory</p><a href="#products"><svg class="ic"><use href="#i-box"/></svg>Products</a><a href="#categories"><svg class="ic"><use href="#i-tag"/></svg>Categories</a></div>
+<div class="grp"><p class="g">Operations</p><a href="#suppliers"><svg class="ic"><use href="#i-truck"/></svg>Suppliers</a><a href="#purchases"><svg class="ic"><use href="#i-in"/></svg>Purchases</a><a href="#sales"><svg class="ic"><use href="#i-bag"/></svg>Sales</a></div>
+<div class="grp"><p class="g">Insights</p><a href="#reports"><svg class="ic"><use href="#i-chart"/></svg>Tax reports</a></div>
+<div class="grp"><p class="g">Admin</p><a href="#users"><svg class="ic"><use href="#i-users"/></svg>Users &amp; Roles</a></div>
+</div>
+<div class="foot"><p class="status"><i></i>Demo data, resets on refresh</p><div class="prof"><span class="av" id="av2"></span><div class="who-text"><b id="un"></b><small id="ur"></small></div><button type="button" class="lo" data-a="logout" data-k="x:0" aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-out"/></svg><span>Log out</span></button></div></div>
+</aside><div class="main"><header class="top"><div><b id="crumb">Overview</b></div><div class="r"><span id="dt"></span><span id="av"></span></div></header>
+
+<!-- 1. FRONT PAGE -->
+<main id="home" class="page">
+<div class="head"><div><p class="eyebrow" id="eb"></p><h1 id="greet"></h1><p class="lead">A steady pulse on your stock, sales, and the work that moved today.</p></div><a class="cta" href="#sales">+ Record a sale</a></div>
+<div id="ov"></div>
+<details class="how"><summary>All options</summary><ul class="opts"><li><a href="#products"><h3>Products</h3><p>Add, update, delete and search stock items.</p></a></li><li><a href="#categories"><h3>Categories</h3><p>Group products and set default tax rates.</p></a></li><li><a href="#suppliers"><h3>Suppliers</h3><p>Keep supplier names and contact details.</p></a></li><li><a href="#purchases"><h3>Purchases</h3><p>Record stock received from suppliers.</p></a></li><li><a href="#sales"><h3>Sales</h3><p>Bill customers with automatic tax.</p></a></li><li><a href="#reports"><h3>Reports</h3><p>Stock levels, best sellers, tax collected.</p></a></li><li><a href="#users"><h3>Users &amp; Roles</h3><p>Staff accounts and who can do what.</p></a></li></ul></details>
+</main>
+
+<!-- 3. OPTION PAGES: activities and process -->
+<section id="products" class="page">
+<div class="head"><div><p class="eyebrow">Inventory / Catalog</p><h2>Products</h2><p class="lead">Every item on your shelves, in one considered place.</p></div><button class="cta" data-a="new" data-k="products:0">+ Add product</button></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Add product</h3><ol><li>Enter name, SKU, category, price</li><li>Set reorder level and optional tax override</li><li>Save: system checks SKU is unique</li><li>Product appears with stock 0</li></ol></div>
+<div class="act"><h3>Update product</h3><ol><li>Click Edit on the product row</li><li>Change the details in the form</li><li>Click Update product</li></ol></div>
+<div class="act"><h3>Delete product</h3><ol><li>Search for the product</li><li>Click Delete, then Confirm delete (admin only)</li><li>Blocked if it has sales or purchases</li></ol></div>
+<div class="act"><h3>Search product</h3><ol><li>Type a name or SKU</li><li>Results list shows price and stock</li><li>Low stock rows are highlighted</li></ol></div>
+</div></details></section>
+
+<section id="categories" class="page">
+<div class="head"><div><p class="eyebrow">Inventory / Taxonomy</p><h2>Categories</h2><p class="lead">Categories group products and carry the default tax rate (0 to 100%).</p></div><button class="cta" data-a="new" data-k="categories:0">+ Add category</button></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Add category</h3><ol><li>Enter a unique category name</li><li>Enter default tax rate</li><li>Save</li></ol></div>
+<div class="act"><h3>Change tax rate</h3><ol><li>Admin clicks Edit on the category row</li><li>Enters the new rate</li><li>Click Update category: past sales keep their old rate</li></ol></div>
+<div class="act"><h3>Delete category</h3><ol><li>Click Delete on the category row, then Confirm delete (admin only)</li><li>Allowed only when it has no products</li></ol></div>
+</div></details></section>
+
+<section id="suppliers" class="page">
+<div class="head"><div><p class="eyebrow">Operations / Sourcing</p><h2>Suppliers</h2><p class="lead">The businesses you buy stock from.</p></div><button class="cta" data-a="new" data-k="suppliers:0">+ Add supplier</button></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Add supplier</h3><ol><li>Enter name and contact info</li><li>Save</li></ol></div>
+<div class="act"><h3>Update supplier</h3><ol><li>Click Edit on the supplier row</li><li>Change the details in the form</li><li>Click Update supplier</li></ol></div>
+<div class="act"><h3>Delete supplier</h3><ol><li>Click Delete on the supplier row</li><li>Click Confirm delete</li><li>Blocked if the supplier has purchases</li></ol></div><div class="act"><h3>View purchase history</h3><ol><li>Click History on a supplier row</li><li>See each purchase with date and cost</li></ol></div>
+</div></details></section>
+
+<section id="purchases" class="page">
+<div class="head"><div><p class="eyebrow">Operations / Inbound</p><h2>Purchases</h2><p class="lead">Record stock arriving from a supplier. Stock on hand goes up automatically.</p></div><button class="cta" data-a="new" data-k="purchases:0">+ New purchase</button></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Record purchase</h3><ol><li>Choose supplier</li><li>Add products with quantity and unit cost</li><li>Save: stock increases and total cost is calculated</li></ol></div>
+<div class="act"><h3>Review purchases</h3><ol><li>Filter by supplier or date</li><li>Open a purchase to see its items</li></ol></div>
+<div class="act"><h3>Reorder from low stock</h3><ol><li>Open the low-stock list</li><li>Pick a product to reorder</li><li>Start a new purchase for it</li></ol></div>
+</div></details></section>
+
+<section id="sales" class="page">
+<div class="head"><div><p class="eyebrow">Operations / Outbound</p><h2>Sales</h2><p class="lead">A quick, clear record of what left the shelf.</p></div><button class="cta" data-a="new" data-k="sales:0">+ New sale</button></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Create sale</h3><ol><li>Enter customer name (optional)</li><li>Add products and quantities</li><li>System applies price and effective tax rate</li><li>Confirm: stock decreases, totals are saved</li></ol></div>
+<div class="act"><h3>Print receipt</h3><ol><li>Click Receipt on a sale</li><li>See subtotal, tax and grand total</li><li>Print or hand over</li></ol></div>
+<div class="act"><h3>Stock check</h3><ol><li>A sale larger than available stock is rejected</li><li>Nothing is saved; the cashier sees a message</li></ol></div>
+</div></details></section>
+
+<section id="reports" class="page">
+<div class="head"><div><p class="eyebrow">Insights / Tax reports</p><h2>Reports</h2><p class="lead">Ready-made answers, generated on demand from the database views and queries.</p></div></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Current stock</h3><ol><li>Open the current-stock view</li><li>Filter by category</li></ol></div>
+<div class="act"><h3>Low-stock alerts</h3><ol><li>Open the low-stock view</li><li>Items at or below reorder level are listed</li></ol></div>
+<div class="act"><h3>Sales per day</h3><ol><li>Pick a date range</li><li>See orders and revenue per day</li></ol></div>
+<div class="act"><h3>Best sellers</h3><ol><li>Count units sold per product</li><li>Top five are shown</li></ol></div>
+<div class="act"><h3>Tax collected</h3><ol><li>Pick a period</li><li>Tax is totalled by category</li></ol></div>
+</div></details></section>
+
+<section id="users" class="page">
+<div class="head"><div><p class="eyebrow">Admin / Access</p><h2>Users &amp; Roles</h2><p class="lead">Admin only. Roles decide who can edit tax rates, delete records or see financial reports.</p></div><button class="cta" data-a="new" data-k="users:0">+ Add user</button></div>
+<div class="app"></div>
+<details class="how"><summary>Activities and process</summary><div class="acts">
+<div class="act"><h3>Add user</h3><ol><li>Enter username, full name and password</li><li>Choose a role</li><li>Click Save user</li></ol></div>
+<div class="act"><h3>Change role</h3><ol><li>Find the user in the table</li><li>Pick a role from the Role list</li><li>The change saves immediately</li></ol></div>
+<div class="act"><h3>Delete user</h3><ol><li>Click Delete on the user row</li><li>Click Confirm delete</li><li>Blocked for your own account and for users with records</li></ol></div><div class="act"><h3>Log in and out</h3><ol><li>Enter username and password on the login page</li><li>Menu and buttons match your role</li><li>Click Log out at the bottom of the sidebar to leave</li></ol></div>
+</div></details></section>
+<footer class="pf"><div><span>Stockroom | A clear view of what moves.</span><span>Inventory Control System</span></div></footer></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="print-receipt" class="print-only" aria-hidden="true"></div>
+<script src="js/api.js"></script>
+<script src="js/script.js"></script>
+</body>
+</html>

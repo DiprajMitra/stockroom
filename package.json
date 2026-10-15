@@ -1,0 +1,15 @@
+{
+  "name": "inventory-control-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Inventory Control System - Oracle 26ai (FreeSQL) backend with role-based access.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test:db": "node test_oracledb.js"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "oracledb": "^26.0.0"
+  }
+}
