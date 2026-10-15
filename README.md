@@ -107,13 +107,41 @@ This installs `express` and `oracledb`.
 
 ### 4. Configure environment variables
 
-The Oracle driver runs in **thick mode** and connects over **mTLS** using the wallet. Set the following environment variables.
+The Oracle driver runs in **thick mode** and connects over **mTLS** using the wallet. The server reads its config from a `.env` file at startup (loaded by `dotenv`), so you only need to edit one place.
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and fill in four values:
+
+| Variable             | Meaning                                                                                                |
+|----------------------|--------------------------------------------------------------------------------------------------------|
+| `TNS_ADMIN`          | Absolute path to the unzipped **FreeSQL wallet** folder (must contain `tnsnames.ora`, `cwallet.sso`, `ewallet.p12`, and the truststore). |
+| `ORACLE_TNS_ALIAS`   | TNS alias from `<TNS_ADMIN>/tnsnames.ora` whose entry uses `PROTOCOL=TCPS`. Do **not** paste a full EZ connect string here. |
+| `ORACLE_USER`        | Your FreeSQL schema user (for example, `SQL_XXXX_SCHEMA_XXXX`).                                       |
+| `ORACLE_PASSWORD`    | That schema user's password.                                                                            |
+
+Example `.env`:
+
+```env
+TNS_ADMIN=/home/you/oracle_wallet
+ORACLE_TNS_ALIAS=26ai_un3c1_tcps
+ORACLE_USER=SQL_24201091_SCHEMA_7V0QS
+ORACLE_PASSWORD=your_password_here
+```
+
+> `.env` is **gitignored** — never commit it. Any values already in your shell environment take precedence over `.env`, so production deploys that inject secrets at the platform level are unaffected.
+
+If you prefer to skip `.env` and export variables in your shell instead, that still works:
 
 **Windows (CMD)**
 
 ```bat
 set TNS_ADMIN=C:\path\to\oracle_wallet
 set ORACLE_TNS_ALIAS=26ai_un3c1_tcps
+set ORACLE_USER=YOUR_SCHEMA
+set ORACLE_PASSWORD=YOUR_PASSWORD
 ```
 
 **Windows (PowerShell)**
@@ -121,6 +149,8 @@ set ORACLE_TNS_ALIAS=26ai_un3c1_tcps
 ```powershell
 $env:TNS_ADMIN = "C:\path\to\oracle_wallet"
 $env:ORACLE_TNS_ALIAS = "26ai_un3c1_tcps"
+$env:ORACLE_USER = "YOUR_SCHEMA"
+$env:ORACLE_PASSWORD = "YOUR_PASSWORD"
 ```
 
 **macOS / Linux**
@@ -128,25 +158,11 @@ $env:ORACLE_TNS_ALIAS = "26ai_un3c1_tcps"
 ```bash
 export TNS_ADMIN=/path/to/oracle_wallet
 export ORACLE_TNS_ALIAS=26ai_un3c1_tcps
+export ORACLE_USER=YOUR_SCHEMA
+export ORACLE_PASSWORD=YOUR_PASSWORD
 ```
 
-> `ORACLE_TNS_ALIAS` must match a TCPS entry inside `tnsnames.ora`. Open the file in the wallet folder and pick the alias that uses `PROTOCOL=TCPS`.
-
-### 5. Update database credentials
-
-Open `server.js` and replace the `DB` block at the top with your own schema credentials, or refactor it to read from environment variables:
-
-```js
-const DB = {
-  user:     process.env.ORACLE_USER     || 'YOUR_SCHEMA',
-  password: process.env.ORACLE_PASSWORD || 'YOUR_PASSWORD',
-  connectString: process.env.ORACLE_TNS_ALIAS || '26ai_un3c1_tcps',
-};
-```
-
-> Never commit real credentials. Use a `.env` file (and add it to `.gitignore`) for any non-demo deployment.
-
-### 6. Provision the database
+### 5. Provision the database
 
 See the [Database Setup](#database-setup) section below for the full schema, views, triggers, package, and seed data.
 
@@ -162,6 +178,11 @@ The server will boot without errors if the wallet and credentials are configured
 - **API root:**  http://localhost:3000/api/
 
 Open the frontend URL in your browser and log in with one of the [demo accounts](#demo-accounts).
+
+> **Prerequisite check.** Before the server can serve traffic, two things must be true on the machine running `npm start`:
+>
+> 1. The Oracle Client libraries are present (`libclntsh.so` on Linux, `oci.dll` on Windows, `libclntsh.dylib` on macOS). If missing, `oracledb` throws `DPI-1047` on boot. Install **Oracle Instant Client** for your OS.
+> 2. `TNS_ADMIN` points at a folder that contains the unzipped FreeSQL wallet (notably `tnsnames.ora` and `cwallet.sso`).
 
 ### 8. (Optional) Run the database smoke test
 
@@ -262,6 +283,8 @@ inventory-control-system/
 |   |-- inventory_control_system_oracle.sql   # Oracle 26ai / FreeSQL schema + seed
 |   |-- seed_bangladesh_demo.sql              # Re-seed with BD demo data
 |   `-- inventory_control_system.sql         # Original MySQL 8.0+ script
+|-- .env.example                          # Template for .env (commit this; copy to .env)
+|-- .gitignore                            # Excludes .env, node_modules, scratch files
 |-- package.json
 `-- README.md
 ```
@@ -278,7 +301,7 @@ inventory-control-system/
 
 If you fork this project for anything beyond a classroom demo, please:
 
-1. Move the database password out of `server.js` and into environment variables.
+1. ~~Move the database password out of `server.js` and into environment variables.~~ **Done** — the server now reads `ORACLE_USER` and `ORACLE_PASSWORD` from `.env` via `dotenv`.
 2. Replace the in-memory session store with a persistent one.
 3. Add rate limiting and CSRF protection to the API.
 4. Enable HTTPS termination at a reverse proxy (Nginx, Caddy, and so on).
@@ -287,7 +310,14 @@ If you fork this project for anything beyond a classroom demo, please:
 
 ## Smoke Test
 
-Verify your Oracle connectivity independently of the full server:
+Verify your Oracle connectivity independently of the full server. `test_oracledb.js` reads the same `.env` file as the server, so a working `.env` covers both:
+
+```bash
+# Make sure .env is in place first (see step 4)
+npm run test:db
+```
+
+If you prefer to export variables in the shell instead, the script will pick those up too:
 
 ```bash
 # Windows
