@@ -22,6 +22,10 @@ const oracledb = require('oracledb');
 const fs = require('fs');
 const path = require('path');
 
+// Load .env (gitignored) so TNS_ADMIN, ORACLE_USER, ORACLE_PASSWORD and
+// ORACLE_TNS_ALIAS don't have to be exported manually for every run.
+require('dotenv').config();
+
 // 1) Load the wallet before anything else.  initOracleClient switches the
 //    driver to THICK mode, which is what understands Oracle wallets and
 //    mTLS (tcps://).  Thin mode does NOT support mTLS wallets.

@@ -9,6 +9,7 @@
     "test:db": "node test_oracledb.js"
   },
   "dependencies": {
+    "dotenv": "^18.0.8",
     "express": "^5.3.0",
     "oracledb": "^26.0.0"
   }

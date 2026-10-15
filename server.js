@@ -23,6 +23,12 @@ const path = require('path');
 const crypto = require('crypto');
 const oracledb = require('oracledb');
 
+// Load .env (gitignored) so TNS_ADMIN, ORACLE_USER, ORACLE_PASSWORD and
+// ORACLE_TNS_ALIAS don't have to be exported manually for every run.
+// Existing process.env values win, so production deploys that inject
+// vars at the platform level are unaffected.
+require('dotenv').config();
+
 // FreeSQL (Oracle Autonomous 26ai) is mTLS only.  We MUST run in thick mode
 // and point it at the unzipped wallet folder via TNS_ADMIN.
 if (!process.env.TNS_ADMIN) {
