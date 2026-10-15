@@ -127,7 +127,7 @@ Example `.env`:
 ```env
 TNS_ADMIN=/home/you/oracle_wallet
 ORACLE_TNS_ALIAS=26ai_un3c1_tcps
-ORACLE_USER=SQL_24201091_SCHEMA_7V0QS
+ORACLE_USER=YOUR_SCHEMA_USER
 ORACLE_PASSWORD=your_password_here
 ```
 
