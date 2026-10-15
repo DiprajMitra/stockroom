@@ -23,30 +23,39 @@ const path = require('path');
 const crypto = require('crypto');
 const oracledb = require('oracledb');
 
-// Load .env (gitignored) so TNS_ADMIN, ORACLE_USER, ORACLE_PASSWORD and
-// ORACLE_TNS_ALIAS don't have to be exported manually for every run.
-// Existing process.env values win, so production deploys that inject
-// vars at the platform level are unaffected.
+// Load .env (gitignored) so ORACLE_USER, ORACLE_PASSWORD, ORACLE_CONNECT_STRING
+// and (optionally) TNS_ADMIN don't have to be exported manually for every run.
+// Existing process.env values win, so production deploys that inject vars
+// at the platform level are unaffected.
 require('dotenv').config();
 
-// FreeSQL (Oracle Autonomous 26ai) is mTLS only.  We MUST run in thick mode
-// and point it at the unzipped wallet folder via TNS_ADMIN.
-if (!process.env.TNS_ADMIN) {
-  console.error('TNS_ADMIN is not set.  Point it at the unzipped FreeSQL wallet folder.');
-  process.exit(1);
+// FreeSQL exposes Oracle 26ai over public TCPS with a server-side TLS
+// certificate.  Client mTLS is NOT required, so we do not need a wallet
+// folder to connect.  Two paths are supported:
+//
+//   1. EZ connect string (default).  Pass the full TCPS URL via
+//      ORACLE_CONNECT_STRING.  No tnsnames.ora, no wallet, no TNS_ADMIN.
+//
+//   2. TNS alias from a FreeSQL wallet.  Set TNS_ADMIN to the unzipped
+//      wallet folder and ORACLE_TNS_ALIAS to a TCPS alias.  initOracleClient
+//      will load the wallet.  Use this path when you want cert pinning
+//      via SSL_SERVER_DN_MATCH.
+if (process.env.TNS_ADMIN) {
+  oracledb.initOracleClient({
+    configDir:      process.env.TNS_ADMIN,
+    walletLocation: process.env.TNS_ADMIN,
+  });
 }
-oracledb.initOracleClient({
-  configDir:      process.env.TNS_ADMIN,
-  walletLocation: process.env.TNS_ADMIN,
-});
 
-// connectString below MUST be a TNS alias that is defined inside
-// <TNS_ADMIN>/tnsnames.ora and uses PROTOCOL=TCPS.
 // Credentials are read from the environment (see .env, which is gitignored).
+// ORACLE_CONNECT_STRING takes precedence; ORACLE_TNS_ALIAS is only used when
+// no EZ string is supplied.
 const DB = {
   user:          process.env.ORACLE_USER,
   password:      process.env.ORACLE_PASSWORD,
-  connectString: process.env.ORACLE_TNS_ALIAS || '26ai_un3c1_tcps',
+  connectString: process.env.ORACLE_CONNECT_STRING
+              || process.env.ORACLE_TNS_ALIAS
+              || 'tcps://db.freesql.com:2484/26ai_un3c1',
 };
 
 const app = express();

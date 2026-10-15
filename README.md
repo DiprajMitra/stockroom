@@ -15,6 +15,7 @@ The system tracks products, categories, suppliers, purchases, and sales, and com
 - [Quick Start](#quick-start)
 - [Database Setup](#database-setup)
 - [Demo Accounts](#demo-accounts)
+- [Optional: TNS alias from a FreeSQL wallet](#optional-tns-alias-from-a-freesql-wallet)
 - [Project Structure](#project-structure)
 - [Security Notes](#security-notes)
 - [Smoke Test](#smoke-test)
@@ -88,7 +89,10 @@ Role checks happen at three independent layers:
 
 - **Node.js** 18+ and **npm**
 - An **Oracle 26ai / FreeSQL** workspace (or any Oracle 19c+ instance with the required privileges)
-- A downloaded **FreeSQL wallet** (a folder containing `tnsnames.ora`, `cwallet.sso`, `ewallet.p12`, and related files)
+- **Oracle Instant Client 23ai** on the machine that runs `npm start` (`libclntsh.so` on Linux, `oci.dll` on Windows, `libclntsh.dylib` on macOS). The free [Basic Light](https://www.oracle.com/bz/database/technologies/instant-client/linux-x86-64-downloads.html) package is enough.
+- A free TCP path to `db.freesql.com:2484` (or your instance's host/port)
+
+> **No wallet is required for the default setup.** FreeSQL accepts an EZ connect string over public TCPS and authenticates the server with a public CA-signed cert; the client only validates the cert, no `cwallet.sso` is needed. If you want to harden the connection with `SSL_SERVER_DN_MATCH` cert pinning, see [Optional: TNS alias from a FreeSQL wallet](#optional-tns-alias-from-a-freesql-wallet) below.
 
 ### 2. Clone the repository
 
@@ -103,32 +107,30 @@ cd inventory-control-system
 npm install
 ```
 
-This installs `express` and `oracledb`.
+This installs `express`, `oracledb`, and `dotenv`.
 
 ### 4. Configure environment variables
 
-The Oracle driver runs in **thick mode** and connects over **mTLS** using the wallet. The server reads its config from a `.env` file at startup (loaded by `dotenv`), so you only need to edit one place.
+The server reads its config from a `.env` file at startup (loaded by `dotenv`), so you only need to edit one place.
 
 ```bash
 cp .env.example .env
 ```
 
-Then open `.env` and fill in four values:
+Then open `.env` and fill in three values:
 
-| Variable             | Meaning                                                                                                |
-|----------------------|--------------------------------------------------------------------------------------------------------|
-| `TNS_ADMIN`          | Absolute path to the unzipped **FreeSQL wallet** folder (must contain `tnsnames.ora`, `cwallet.sso`, `ewallet.p12`, and the truststore). |
-| `ORACLE_TNS_ALIAS`   | TNS alias from `<TNS_ADMIN>/tnsnames.ora` whose entry uses `PROTOCOL=TCPS`. Do **not** paste a full EZ connect string here. |
-| `ORACLE_USER`        | Your FreeSQL schema user (for example, `SQL_XXXX_SCHEMA_XXXX`).                                       |
-| `ORACLE_PASSWORD`    | That schema user's password.                                                                            |
+| Variable                  | Meaning                                                                                                |
+|---------------------------|--------------------------------------------------------------------------------------------------------|
+| `ORACLE_USER`             | Your FreeSQL schema user (for example, `SQL_XXXX_SCHEMA_XXXX`).                                        |
+| `ORACLE_PASSWORD`         | That schema user's password.                                                                           |
+| `ORACLE_CONNECT_STRING`   | Full EZ connect string. The default `tcps://db.freesql.com:2484/26ai_un3c1` is the public FreeSQL endpoint. |
 
 Example `.env`:
 
 ```env
-TNS_ADMIN=/home/you/oracle_wallet
-ORACLE_TNS_ALIAS=26ai_un3c1_tcps
 ORACLE_USER=YOUR_SCHEMA_USER
 ORACLE_PASSWORD=your_password_here
+ORACLE_CONNECT_STRING=tcps://db.freesql.com:2484/26ai_un3c1
 ```
 
 > `.env` is **gitignored** — never commit it. Any values already in your shell environment take precedence over `.env`, so production deploys that inject secrets at the platform level are unaffected.
@@ -138,28 +140,25 @@ If you prefer to skip `.env` and export variables in your shell instead, that st
 **Windows (CMD)**
 
 ```bat
-set TNS_ADMIN=C:\path\to\oracle_wallet
-set ORACLE_TNS_ALIAS=26ai_un3c1_tcps
 set ORACLE_USER=YOUR_SCHEMA
 set ORACLE_PASSWORD=YOUR_PASSWORD
+set ORACLE_CONNECT_STRING=tcps://db.freesql.com:2484/26ai_un3c1
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-$env:TNS_ADMIN = "C:\path\to\oracle_wallet"
-$env:ORACLE_TNS_ALIAS = "26ai_un3c1_tcps"
 $env:ORACLE_USER = "YOUR_SCHEMA"
 $env:ORACLE_PASSWORD = "YOUR_PASSWORD"
+$env:ORACLE_CONNECT_STRING = "tcps://db.freesql.com:2484/26ai_un3c1"
 ```
 
 **macOS / Linux**
 
 ```bash
-export TNS_ADMIN=/path/to/oracle_wallet
-export ORACLE_TNS_ALIAS=26ai_un3c1_tcps
 export ORACLE_USER=YOUR_SCHEMA
 export ORACLE_PASSWORD=YOUR_PASSWORD
+export ORACLE_CONNECT_STRING=tcps://db.freesql.com:2484/26ai_un3c1
 ```
 
 ### 5. Provision the database
@@ -179,10 +178,11 @@ The server will boot without errors if the wallet and credentials are configured
 
 Open the frontend URL in your browser and log in with one of the [demo accounts](#demo-accounts).
 
-> **Prerequisite check.** Before the server can serve traffic, two things must be true on the machine running `npm start`:
+> **Prerequisite check.** Before the server can serve traffic, one thing must be true on the machine running `npm start`:
 >
 > 1. The Oracle Client libraries are present (`libclntsh.so` on Linux, `oci.dll` on Windows, `libclntsh.dylib` on macOS). If missing, `oracledb` throws `DPI-1047` on boot. Install **Oracle Instant Client** for your OS.
-> 2. `TNS_ADMIN` points at a folder that contains the unzipped FreeSQL wallet (notably `tnsnames.ora` and `cwallet.sso`).
+>
+> No wallet is needed for the default EZ connect string setup. If you opt into the [wallet / TNS alias path](#optional-tns-alias-from-a-freesql-wallet) instead, `TNS_ADMIN` must also point at a folder containing `tnsnames.ora` and `cwallet.sso`.
 
 ### 8. (Optional) Run the database smoke test
 
@@ -190,12 +190,27 @@ Open the frontend URL in your browser and log in with one of the [demo accounts]
 npm run test:db
 ```
 
-Expected output:
+Expected output: `Connection was successful!` and the Oracle banner.
 
-```
-Connection was successful!
-Banner: ...
-```
+---
+
+## Optional: TNS alias from a FreeSQL wallet
+
+The default config uses an **EZ connect string** (`tcps://host:port/service`) and connects straight over public TCPS — no wallet, no `tnsnames.ora` lookup, no cert pinning. This is the simplest setup and works for development and most teaching deployments.
+
+If you want to harden the connection (for example, to enforce `SSL_SERVER_DN_MATCH` so the client refuses any cert that doesn't match the wallet's expected DN), download the wallet from the FreeSQL/OCI console and switch to the TNS-alias path:
+
+1. In the FreeSQL/OCI console, open your database and download the wallet zip.
+2. Unzip it somewhere readable, e.g. `~/oracle_wallet/`. The folder will contain `tnsnames.ora`, `sqlnet.ora`, `cwallet.sso`, `ewallet.p12`, and a truststore.
+3. Edit `.env`:
+   ```env
+   ORACLE_CONNECT_STRING=
+   TNS_ADMIN=/home/you/oracle_wallet
+   ORACLE_TNS_ALIAS=26ai_un3c1_tcps
+   ```
+4. Restart the server. `initOracleClient` will load the wallet and `oracledb` will resolve `ORACLE_TNS_ALIAS` from `tnsnames.ora`.
+
+When `TNS_ADMIN` is set, the server takes the wallet path. When it is empty, the server falls back to the EZ connect string.
 
 ---
 
@@ -296,7 +311,7 @@ inventory-control-system/
 - **Passwords** are stored as hashes in the `users` table.
 - **Sessions** are in-memory tokens, which is acceptable for a classroom demo; swap for Redis or a JWT scheme in production.
 - **SQL injection** is prevented by using bind variables throughout `server.js`.
-- **mTLS** is enforced by the Oracle driver against the FreeSQL wallet.
+- **mTLS** is **not** required by FreeSQL. The default setup uses a public CA-signed server cert and validates it via the system trust store. For production-grade cert pinning, see the [wallet / TNS alias path](#optional-tns-alias-from-a-freesql-wallet).
 - **Defence in depth** — authorisation is verified in the server, in triggers, and in stored procedures. See the [Architecture](#architecture) section.
 
 If you fork this project for anything beyond a classroom demo, please:
