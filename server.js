@@ -62,25 +62,60 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// --- Sessions (in-memory, fine for the classroom demo) -------------------
-const sessions = new Map(); // token -> { user_id, role }
-function newToken() { return crypto.randomBytes(24).toString('hex'); }
+// --- Sessions (Stateless HMAC-signed cookies, works seamlessly on Vercel serverless & local) ---
+const SESSION_SECRET = process.env.SESSION_SECRET || 'stockroom_session_secret_2026_uap';
+
+function signSession(data) {
+  const json = JSON.stringify(data);
+  const b64 = Buffer.from(json).toString('base64url');
+  const hmac = crypto.createHmac('sha256', SESSION_SECRET).update(b64).digest('base64url');
+  return `${b64}.${hmac}`;
+}
+
+function verifySession(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [b64, hmac] = parts;
+  const expectedHmac = crypto.createHmac('sha256', SESSION_SECRET).update(b64).digest('base64url');
+  if (hmac.length !== expectedHmac.length) return null;
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) {
+      return null;
+    }
+    const data = JSON.parse(Buffer.from(b64, 'base64url').toString('utf8'));
+    if (data.exp && data.exp < Date.now()) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 function getSession(req) {
   const h = req.headers.cookie || '';
-  const m = h.match(/(?:^|;\s*)sid=([a-f0-9]+)/);
-  return m ? sessions.get(m[1]) : null;
+  const m = h.match(/(?:^|;\s*)sid=([^;]+)/);
+  if (!m) return null;
+  return verifySession(m[1].trim());
 }
+
 function setSession(res, sess) {
-  const tok = newToken();
-  sessions.set(tok, sess);
-  res.setHeader('Set-Cookie', 'sid=' + tok + '; Path=/; HttpOnly; SameSite=Strict');
+  const payload = {
+    user_id: sess.user_id,
+    role: sess.role,
+    full_name: sess.full_name,
+    username: sess.username,
+    exp: Date.now() + 7 * 86400000 // 7 days
+  };
+  const tok = signSession(payload);
+  const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+  res.setHeader('Set-Cookie', `sid=${tok}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${isProd ? '; Secure' : ''}`);
 }
+
 function clearSession(req, res) {
-  const h = req.headers.cookie || '';
-  const m = h.match(/(?:^|;\s*)sid=([a-f0-9]+)/);
-  if (m) sessions.delete(m[1]);
-  res.setHeader('Set-Cookie', 'sid=; Path=/; Max-Age=0');
+  const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+  res.setHeader('Set-Cookie', `sid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${isProd ? '; Secure' : ''}`);
 }
+
 function requireRole(req, res, allowed) {
   const s = getSession(req);
   if (!s) { res.status(401).json({ error: 'Not signed in.' }); return null; }
@@ -94,7 +129,14 @@ function requireRole(req, res, allowed) {
 // --- Oracle helpers -------------------------------------------------------
 let pool;
 async function db() {
-  if (!pool) pool = await oracledb.createPool({ ...DB, poolMin: 1, poolMax: 4 });
+  if (!pool) {
+    pool = await oracledb.createPool({
+      ...DB,
+      poolMin: 0,
+      poolMax: 2,
+      poolTimeout: 60,
+    });
+  }
   return pool;
 }
 async function withConn(fn) {
@@ -695,4 +737,8 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // --- Start server --------------------------------------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Inventory server on http://localhost:${PORT}`));
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Inventory server on http://localhost:${PORT}`));
+}
+
+module.exports = app;
