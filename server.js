@@ -62,6 +62,21 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+// Dual-database adapter support (FreeSQL Oracle 26ai <-> Supabase PostgreSQL)
+const { adapter: sbAdapter, mapSupabaseError } = require('./supabaseAdapter');
+
+function getDb(req) {
+  const hdr = req.headers['x-active-db'];
+  if (hdr === 'supabase' || hdr === 'freesql') return hdr;
+  const m = (req.headers.cookie || '').match(/(?:^|;\s*)active_db=([a-zA-Z0-9_-]+)/);
+  return (m && m[1] === 'supabase') ? 'supabase' : 'freesql';
+}
+
+function handleSbErr(e, res) {
+  const err = mapSupabaseError(e);
+  res.status((err && err.status) || 500).json({ error: (err && err.message) || e.message });
+}
+
 // --- Sessions (Stateless HMAC-signed cookies, works seamlessly on Vercel serverless & local) ---
 const SESSION_SECRET = process.env.SESSION_SECRET || 'stockroom_session_secret_2026_uap';
 
@@ -199,6 +214,18 @@ function canEdit(role, page) { return role === 'admin' || (EDIT[role] || []).inc
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username and password required.' });
+
+  if (getDb(req) === 'supabase') {
+    try {
+      const u = await sbAdapter.login(username, password);
+      if (!u) return res.status(401).json({ error: 'Wrong username or password.' });
+      setSession(res, { user_id: u.user_id, role: u.role, full_name: u.full_name, username: u.username });
+      return res.json({ user_id: u.user_id, username: u.username, full_name: u.full_name, role: u.role });
+    } catch (e) {
+      return handleSbErr(e, res);
+    }
+  }
+
   try {
     const rows = await withConn(async c => {
       const r = await c.execute(
@@ -243,9 +270,45 @@ app.get('/api/permissions', (req, res) => {
   });
 });
 
+// database switching
+app.get('/api/db/current', (req, res) => {
+  const active = getDb(req);
+  res.json({
+    active,
+    label: active === 'supabase' ? 'Supabase (PostgreSQL)' : 'FreeSQL (Oracle 26ai)',
+    target: active === 'supabase' ? 'freesql' : 'supabase',
+    targetLabel: active === 'supabase' ? 'FreeSQL (Oracle 26ai)' : 'Supabase (PostgreSQL)'
+  });
+});
+
+app.post('/api/db/switch', (req, res) => {
+  let target = req.body && req.body.db;
+  if (!target) {
+    target = getDb(req) === 'supabase' ? 'freesql' : 'supabase';
+  }
+  if (target !== 'freesql' && target !== 'supabase') {
+    return res.status(400).json({ error: 'Invalid database engine. Allowed: freesql, supabase.' });
+  }
+  const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+  res.setHeader('Set-Cookie', `active_db=${target}; Path=/; SameSite=Lax; Max-Age=31536000${isProd ? '; Secure' : ''}`);
+  res.json({
+    ok: true,
+    active: target,
+    label: target === 'supabase' ? 'Supabase (PostgreSQL)' : 'FreeSQL (Oracle 26ai)',
+    target: target === 'supabase' ? 'freesql' : 'supabase',
+    targetLabel: target === 'supabase' ? 'FreeSQL (Oracle 26ai)' : 'Supabase (PostgreSQL)'
+  });
+});
+
 // products
 app.get('/api/products', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'sales_staff', 'inventory_clerk']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      const rows = await sbAdapter.getProducts();
+      return res.json(rows);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const rows = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       // NOTE: every column is aliased with double-quotes so it stays
@@ -274,6 +337,12 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'inventory_clerk']); if (!s) return;
   const d = req.body || {};
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.saveProduct(d, s.user_id);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       if (d.product_id) {
@@ -302,6 +371,12 @@ app.post('/api/products', async (req, res) => {
 });
 app.delete('/api/products/:id', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.deleteProduct(req.params.id);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       await cn.execute(`DELETE FROM products WHERE product_id = :id`,
@@ -314,6 +389,12 @@ app.delete('/api/products/:id', async (req, res) => {
 // categories
 app.get('/api/categories', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'inventory_clerk']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      const rows = await sbAdapter.getCategories();
+      return res.json(rows);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const rows = await withConn(c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(
@@ -330,6 +411,12 @@ app.get('/api/categories', async (req, res) => {
 app.post('/api/categories', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'inventory_clerk']); if (!s) return;
   const d = req.body || {};
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.saveCategory(d);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       if (d.category_id) {
@@ -345,6 +432,12 @@ app.post('/api/categories', async (req, res) => {
 });
 app.delete('/api/categories/:id', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.deleteCategory(req.params.id);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       await cn.execute(`DELETE FROM categories WHERE category_id = :id`, { id: +req.params.id }, { autoCommit: true });
@@ -356,6 +449,12 @@ app.delete('/api/categories/:id', async (req, res) => {
 // suppliers
 app.get('/api/suppliers', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'inventory_clerk']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      const rows = await sbAdapter.getSuppliers();
+      return res.json(rows);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const rows = await withConn(c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(
@@ -372,6 +471,12 @@ app.get('/api/suppliers', async (req, res) => {
 app.post('/api/suppliers', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'inventory_clerk']); if (!s) return;
   const d = req.body || {};
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.saveSupplier(d);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       if (d.supplier_id) {
@@ -387,6 +492,12 @@ app.post('/api/suppliers', async (req, res) => {
 });
 app.delete('/api/suppliers/:id', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.deleteSupplier(req.params.id);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       await cn.execute(`DELETE FROM suppliers WHERE supplier_id = :id`, { id: +req.params.id }, { autoCommit: true });
@@ -398,6 +509,12 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 // purchases
 app.get('/api/purchases', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'inventory_clerk']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      const rows = await sbAdapter.getPurchases();
+      return res.json(rows);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const rows = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(`
@@ -423,6 +540,12 @@ app.post('/api/restock', async (req, res) => {
   // basic validation
   if (!product_id || !supplier_id || !quantity || quantity <= 0 || unit_cost == null || unit_cost < 0) {
     return res.status(400).json({ error: 'product_id, supplier_id, quantity (>0) and unit_cost (>=0) are required.' });
+  }
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.restock(product_id, supplier_id, quantity, unit_cost, s.user_id);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
   }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
@@ -462,6 +585,12 @@ app.post('/api/sales', async (req, res) => {
       return res.status(400).json({ error: 'Every line needs a product and a positive quantity.' });
     }
   }
+  if (getDb(req) === 'supabase') {
+    try {
+      const newId = await sbAdapter.createSale(s.user_id, d.customer_name, d.items);
+      return res.json({ id: newId });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const newId = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       // 1) Insert the sale header.  RETURNING gives us the new id.
@@ -496,6 +625,12 @@ app.post('/api/sales', async (req, res) => {
 });
 app.get('/api/sales', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'sales_staff']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      const rows = await sbAdapter.getSales();
+      return res.json(rows);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const rows = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(`
@@ -531,6 +666,12 @@ app.get('/api/sales', async (req, res) => {
 app.get('/api/overview', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'sales_staff', 'inventory_clerk']); if (!s) return;
   const showSales = canSee(s.role, 'sales');
+  if (getDb(req) === 'supabase') {
+    try {
+      const out = await sbAdapter.getOverview(showSales);
+      return res.json(out);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const out = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       // Stats
@@ -606,6 +747,12 @@ app.get('/api/reports', async (req, res) => {
   const s = requireRole(req, res, ['admin', 'sales_staff', 'inventory_clerk']); if (!s) return;
   const f = req.query || {};
   const showSales = canSee(s.role, 'sales');
+  if (getDb(req) === 'supabase') {
+    try {
+      const out = await sbAdapter.getReports(f, showSales);
+      return res.json(out);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const out = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       const stock = await cn.execute(`
@@ -652,6 +799,12 @@ app.get('/api/reports', async (req, res) => {
 // users (admin only)
 app.get('/api/users', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
+  if (getDb(req) === 'supabase') {
+    try {
+      const rows = await sbAdapter.getUsers();
+      return res.json(rows);
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     const rows = await withConn(c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(
@@ -677,6 +830,17 @@ app.post('/api/users', async (req, res) => {
   const allowedRoles = ['admin', 'sales_staff', 'inventory_clerk'];
   if (!allowedRoles.includes(d.role)) {
     return res.status(400).json({ error: 'Invalid role selected.' });
+  }
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.saveUser({
+        username: cleanUsername,
+        password: String(d.password),
+        full_name: String(d.full_name).trim(),
+        role: d.role
+      });
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
   }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
@@ -706,6 +870,12 @@ app.patch('/api/users/:id/role', async (req, res) => {
   if (targetId === s.user_id && role !== 'admin') {
     return res.status(400).json({ error: 'Security restriction: You cannot remove your own admin privileges.' });
   }
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.setUserRole(targetId, role);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       await cn.execute(
@@ -721,6 +891,12 @@ app.delete('/api/users/:id', async (req, res) => {
   const targetId = +req.params.id;
   if (targetId === s.user_id) {
     return res.status(400).json({ error: 'Security restriction: You cannot delete your own logged-in admin account.' });
+  }
+  if (getDb(req) === 'supabase') {
+    try {
+      await sbAdapter.deleteUser(targetId);
+      return res.json({ ok: true });
+    } catch (e) { return handleSbErr(e, res); }
   }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {

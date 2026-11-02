@@ -136,8 +136,14 @@
     // overview - return the same shape script.js expects
     overviewStats: async () => {
       const o = await loadOverview();
-      const s = o.stats;
-      return { totalToday: s.TOTALTODAY || 0, inventoryValue: s.INVENTORYVALUE || 0, products: s.PRODUCTS || 0, lowCount: s.LOWCOUNT || 0, taxAll: s.TAXALL || 0 };
+      const s = o.stats || {};
+      return {
+        totalToday: s.TOTALTODAY ?? s.totalToday ?? 0,
+        inventoryValue: s.INVENTORYVALUE ?? s.inventoryValue ?? 0,
+        products: s.PRODUCTS ?? s.products ?? 0,
+        lowCount: s.LOWCOUNT ?? s.lowCount ?? 0,
+        taxAll: s.TAXALL ?? s.taxAll ?? 0
+      };
     },
     overviewDailySales: async () => (await loadOverview()).days,
     overviewLowStock:   async () => (await loadOverview()).low,
@@ -154,6 +160,12 @@
     saveUser:        (d)       => call('POST', '/api/users', d),
     setUserRole:     (uid, r)  => call('PATCH', '/api/users/' + uid + '/role', { role: r }),
     deleteUser:      (id)      => call('DELETE', '/api/users/' + id),
+    // database engine
+    currentDb:       ()        => call('GET',  '/api/db/current'),
+    switchDb:        async (db) => {
+      invalidateOverview();
+      return await call('POST', '/api/db/switch', db ? { db } : {});
+    },
   };
 })();
 

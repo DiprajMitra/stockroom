@@ -28,6 +28,14 @@
 <label>Username<input name="username" autocomplete="username" required></label>
 <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
 <p id="lerr" class="err" role="alert"></p><button class="cta">Sign in</button>
+<div class="login-db-box">
+  <small class="login-db-title">Database Engine</small>
+  <button type="button" class="login-db-toggle-btn" id="login-db-toggle-btn" title="Click to toggle between FreeSQL and Supabase">
+    <span class="db-dot"></span>
+    <span id="login-db-label">FreeSQL (Oracle 26ai)</span>
+    <span class="db-swap-tag">Switch &#8644;</span>
+  </button>
+</div>
 <div class="demo"><small>Demo accounts (click to fill)</small>
 <button type="button" data-a="fill" data-k="zubaer:admin123">Admin: zubaer / admin123</button>
 <button type="button" data-a="fill" data-k="nasim:sales123">Sales staff: nasim / sales123</button>
@@ -41,8 +49,16 @@
 <div class="grp"><p class="g">Insights</p><a href="#reports"><svg class="ic"><use href="#i-chart"/></svg>Tax reports</a></div>
 <div class="grp"><p class="g">Admin</p><a href="#users"><svg class="ic"><use href="#i-users"/></svg>Users &amp; Roles</a></div>
 </div>
-<div class="foot"><p class="status"><i></i>Connected to Oracle 26ai (FreeSQL)</p><div class="prof"><span class="av" id="av2"></span><div class="who-text"><b id="un"></b><small id="ur"></small></div><button type="button" class="lo" data-a="logout" data-k="x:0" aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-out"/></svg><span>Log out</span></button></div></div>
-</aside><div class="main"><header class="top"><div><b id="crumb">Overview</b></div><div class="r"><span id="dt"></span><div class="profile-menu-container"><button type="button" class="profile-trigger" id="profile-trigger" aria-haspopup="true" aria-expanded="false" title="Click to view profile &amp; log out"><span id="av"></span></button><div class="profile-dropdown" id="profile-dropdown" role="menu"><div class="pd-header"><span class="pd-av" id="pd-av"></span><div class="pd-user"><b id="pd-name">Operator</b><small id="pd-username">@user</small></div></div><div class="pd-role-badge"><span class="role-badge" id="pd-role">Role</span></div><hr class="pd-sep"><div class="pd-meta"><small>Database</small><span>Oracle 26ai (FreeSQL)</span></div><hr class="pd-sep"><button type="button" class="pd-logout-btn" data-a="logout"><svg class="ic"><use href="#i-out"/></svg><span>Log out</span></button></div></div></div></header>
+<div class="foot">
+  <div class="db-bar">
+    <p class="status" id="sidebar-db-status"><i></i><span id="side-db-label">Connected to Oracle 26ai (FreeSQL)</span></p>
+    <button type="button" class="db-toggle-btn" id="side-db-toggle-btn" title="Toggle between FreeSQL Oracle 26ai and Supabase PostgreSQL">
+      <span>&#8644;</span> <span id="side-db-btn-text">Switch to Supabase</span>
+    </button>
+  </div>
+  <div class="prof"><span class="av" id="av2"></span><div class="who-text"><b id="un"></b><small id="ur"></small></div><button type="button" class="lo" data-a="logout" data-k="x:0" aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-out"/></svg><span>Log out</span></button></div>
+</div>
+</aside><div class="main"><header class="top"><div><b id="crumb">Overview</b></div><div class="r"><button type="button" class="top-db-btn" id="top-db-toggle-btn" title="Click to toggle database engine (FreeSQL Oracle 26ai <-> Supabase PostgreSQL)"><span class="db-dot"></span><span id="top-db-name">Oracle 26ai</span><span class="top-db-arrow">&#8644;</span></button><span id="dt"></span><div class="profile-menu-container"><button type="button" class="profile-trigger" id="profile-trigger" aria-haspopup="true" aria-expanded="false" title="Click to view profile &amp; log out"><span id="av"></span></button><div class="profile-dropdown" id="profile-dropdown" role="menu"><div class="pd-header"><span class="pd-av" id="pd-av"></span><div class="pd-user"><b id="pd-name">Operator</b><small id="pd-username">@user</small></div></div><div class="pd-role-badge"><span class="role-badge" id="pd-role">Role</span></div><hr class="pd-sep"><div class="pd-meta"><small>Active Database</small><div class="pd-db-control"><span id="pd-db-name">Oracle 26ai (FreeSQL)</span><button type="button" class="pd-db-switch-btn" id="pd-db-switch-btn" title="Switch database">Switch &#8644;</button></div></div><hr class="pd-sep"><button type="button" class="pd-logout-btn" data-a="logout"><svg class="ic"><use href="#i-out"/></svg><span>Log out</span></button></div></div></div></header>
 
 <!-- 1. FRONT PAGE -->
 <main id="home" class="page">

@@ -83,6 +83,73 @@ const msg = (t, bad) => {
   tm = setTimeout(() => el.className = '', 4000);
 };
 
+// -- Dual-database status & switching (FreeSQL Oracle 26ai <-> Supabase PostgreSQL) --
+let currentDbEngine = 'freesql';
+
+function syncDbUi(info) {
+  if (!info) return;
+  currentDbEngine = info.active || 'freesql';
+  document.body.dataset.db = currentDbEngine;
+
+  const isSb = currentDbEngine === 'supabase';
+  const shortName = isSb ? 'Supabase PG' : 'Oracle 26ai';
+  const fullName = isSb ? 'Supabase (PostgreSQL)' : 'FreeSQL (Oracle 26ai)';
+  const targetName = isSb ? 'FreeSQL' : 'Supabase';
+
+  const topDbName = $('#top-db-name');
+  if (topDbName) topDbName.textContent = shortName;
+
+  const sideDbLabel = $('#side-db-label');
+  if (sideDbLabel) sideDbLabel.textContent = `Connected to ${shortName}`;
+  const sideDbBtn = $('#side-db-btn-text');
+  if (sideDbBtn) sideDbBtn.textContent = `Switch to ${targetName}`;
+
+  const pdDbName = $('#pd-db-name');
+  if (pdDbName) pdDbName.textContent = fullName;
+  const pdDbBtn = $('#pd-db-switch-btn');
+  if (pdDbBtn) pdDbBtn.textContent = `Switch to ${targetName} ⇄`;
+
+  const loginDbLabel = $('#login-db-label');
+  if (loginDbLabel) loginDbLabel.textContent = fullName;
+  const loginBtn = $('#login-db-toggle-btn .db-swap-tag');
+  if (loginBtn) loginBtn.textContent = `Switch to ${targetName} ⇄`;
+
+  $$('.db-dot').forEach(dot => {
+    dot.classList.toggle('supabase', isSb);
+    dot.classList.toggle('oracle', !isSb);
+  });
+}
+
+async function refreshDbStatus() {
+  try {
+    const info = await api.currentDb();
+    syncDbUi(info);
+    return info;
+  } catch (e) {
+    console.error('Failed to get database status:', e);
+  }
+}
+
+async function toggleDatabase(targetEngine) {
+  try {
+    const res = await api.switchDb(targetEngine);
+    if (res && res.ok) {
+      syncDbUi(res);
+      msg(`Switched active database to ${res.label || res.active}!`);
+      invalidatePerms();
+      const me = await getCurrentUser();
+      if (me && me.user_id) {
+        await loadPerms();
+        await renderAll();
+      } else {
+        await renderAll();
+      }
+    }
+  } catch (e) {
+    msg('Failed to switch database: ' + (e.message || 'Unknown error'), 1);
+  }
+}
+
 // -- Form / Table HTML helpers --
 const fld = (l, n, v, a='')  => `<label>${l}<input name="${n}" value="${esc(v)}" ${a}></label>`;
 const sel = (l, n, items, v, a='') =>
@@ -1191,6 +1258,14 @@ document.addEventListener('submit', async (ev) => {
 });
 
 document.addEventListener('click', async (ev) => {
+  // Database toggle buttons
+  const dbBtn = ev.target.closest('#top-db-toggle-btn, #side-db-toggle-btn, #login-db-toggle-btn, #pd-db-switch-btn');
+  if (dbBtn) {
+    ev.preventDefault();
+    await toggleDatabase();
+    return;
+  }
+
   // 1. Profile trigger toggle
   if (ev.target.closest('#profile-trigger')) {
     toggleProfileDropdown();
@@ -1442,6 +1517,7 @@ window.addEventListener('hashchange', async () => {
 
 // App Startup: Verify session & render or display login
 async function initApp() {
+  await refreshDbStatus();
   const me = await getCurrentUser();
   if (me && me.user_id) {
     document.body.classList.add('in');

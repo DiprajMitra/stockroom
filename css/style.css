@@ -460,3 +460,162 @@ body.modal-open{overflow:hidden}
   thead{display:table-header-group}
   tr,td,th{page-break-inside:avoid}
 }
+
+/* ============================================================
+   Dual-Database Engine Switcher & Status Indicators
+   ============================================================ */
+
+/* Glowing Status Dots */
+.db-dot{
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#2a9d8f;
+  box-shadow:0 0 0 2px rgba(42,157,143,.2), 0 0 6px rgba(42,157,143,.5);
+  animation:dbPulse 2s infinite ease-in-out;
+  flex-shrink:0;
+}
+.db-dot.oracle, [data-db="freesql"] .db-dot{
+  background:#e76f51;
+  box-shadow:0 0 0 2px rgba(231,111,81,.2), 0 0 6px rgba(231,111,81,.5);
+}
+.db-dot.supabase, [data-db="supabase"] .db-dot{
+  background:#3ecf8e;
+  box-shadow:0 0 0 2px rgba(62,207,142,.2), 0 0 6px rgba(62,207,142,.5);
+}
+@keyframes dbPulse{
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(1.2);opacity:.85}
+}
+
+/* Login screen DB toggle */
+.login-db-box{
+  margin-top:14px;
+  padding:10px 12px;
+  background:rgba(255,255,255,.7);
+  border:1px solid var(--border);
+  border-radius:8px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.login-db-title{
+  font:500 11px "IBM Plex Mono",monospace;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:var(--muted);
+}
+.login-db-toggle-btn{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  padding:7px 10px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  cursor:pointer;
+  font:600 12px Manrope,system-ui,sans-serif;
+  color:var(--ink);
+  transition:all .15s ease;
+  text-align:left;
+}
+.login-db-toggle-btn:hover{
+  border-color:var(--accent);
+  background:rgba(42,157,143,.04);
+  transform:translateY(-1px);
+}
+.login-db-toggle-btn .db-swap-tag{
+  margin-left:auto;
+  font:600 11px "IBM Plex Mono",monospace;
+  color:var(--accent);
+  background:rgba(42,157,143,.1);
+  padding:2px 6px;
+  border-radius:4px;
+}
+
+/* Top bar quick switch button */
+.top-db-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:5px 10px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  cursor:pointer;
+  font:600 11px "IBM Plex Mono",monospace;
+  color:var(--ink);
+  transition:all .15s ease;
+}
+.top-db-btn:hover{
+  border-color:var(--accent);
+  background:rgba(42,157,143,.06);
+  transform:translateY(-1px);
+  box-shadow:0 2px 6px rgba(0,0,0,.04);
+}
+.top-db-arrow{
+  color:var(--accent);
+  font-weight:700;
+  margin-left:2px;
+}
+
+/* Sidebar DB bar */
+.db-bar{
+  margin-bottom:12px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.db-toggle-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:100%;
+  padding:6px 10px;
+  background:transparent;
+  border:1px dashed var(--border);
+  border-radius:6px;
+  font:600 11px Manrope,system-ui,sans-serif;
+  color:var(--ink);
+  cursor:pointer;
+  transition:all .15s ease;
+}
+.db-toggle-btn:hover{
+  background:var(--card);
+  border-style:solid;
+  border-color:var(--accent);
+  color:var(--accent);
+  transform:translateY(-1px);
+}
+
+/* Profile menu DB row */
+.pd-db-control{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-top:4px;
+}
+.pd-db-control span{
+  font:600 12px Manrope,system-ui,sans-serif;
+  color:var(--ink);
+}
+.pd-db-switch-btn{
+  padding:3px 8px;
+  border:1px solid var(--border);
+  border-radius:4px;
+  background:var(--bg);
+  font:600 11px "IBM Plex Mono",monospace;
+  color:var(--accent);
+  cursor:pointer;
+  transition:all .12s ease;
+}
+.pd-db-switch-btn:hover{
+  background:var(--accent);
+  color:#fff;
+  border-color:var(--accent);
+}
+
