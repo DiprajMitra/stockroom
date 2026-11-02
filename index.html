@@ -41,8 +41,8 @@
 <div class="grp"><p class="g">Insights</p><a href="#reports"><svg class="ic"><use href="#i-chart"/></svg>Tax reports</a></div>
 <div class="grp"><p class="g">Admin</p><a href="#users"><svg class="ic"><use href="#i-users"/></svg>Users &amp; Roles</a></div>
 </div>
-<div class="foot"><p class="status"><i></i>Demo data, resets on refresh</p><div class="prof"><span class="av" id="av2"></span><div class="who-text"><b id="un"></b><small id="ur"></small></div><button type="button" class="lo" data-a="logout" data-k="x:0" aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-out"/></svg><span>Log out</span></button></div></div>
-</aside><div class="main"><header class="top"><div><b id="crumb">Overview</b></div><div class="r"><span id="dt"></span><span id="av"></span></div></header>
+<div class="foot"><p class="status"><i></i>Connected to Oracle 26ai (FreeSQL)</p><div class="prof"><span class="av" id="av2"></span><div class="who-text"><b id="un"></b><small id="ur"></small></div><button type="button" class="lo" data-a="logout" data-k="x:0" aria-label="Log out" title="Log out"><svg class="ic" aria-hidden="true"><use href="#i-out"/></svg><span>Log out</span></button></div></div>
+</aside><div class="main"><header class="top"><div><b id="crumb">Overview</b></div><div class="r"><span id="dt"></span><div class="profile-menu-container"><button type="button" class="profile-trigger" id="profile-trigger" aria-haspopup="true" aria-expanded="false" title="Click to view profile &amp; log out"><span id="av"></span></button><div class="profile-dropdown" id="profile-dropdown" role="menu"><div class="pd-header"><span class="pd-av" id="pd-av"></span><div class="pd-user"><b id="pd-name">Operator</b><small id="pd-username">@user</small></div></div><div class="pd-role-badge"><span class="role-badge" id="pd-role">Role</span></div><hr class="pd-sep"><div class="pd-meta"><small>Database</small><span>Oracle 26ai (FreeSQL)</span></div><hr class="pd-sep"><button type="button" class="pd-logout-btn" data-a="logout"><svg class="ic"><use href="#i-out"/></svg><span>Log out</span></button></div></div></div></header>
 
 <!-- 1. FRONT PAGE -->
 <main id="home" class="page">
@@ -110,7 +110,7 @@
 </div></details></section>
 
 <section id="users" class="page">
-<div class="head"><div><p class="eyebrow">Admin / Access</p><h2>Users &amp; Roles</h2><p class="lead">Admin only. Roles decide who can edit tax rates, delete records or see financial reports.</p></div><button class="cta" data-a="new" data-k="users:0">+ Add user</button></div>
+<div class="head"><div><p class="eyebrow">Admin / Security &amp; Access</p><h2>Users &amp; Roles Control Panel</h2><p class="lead">System administrator control desk. Provision staff accounts, manage cryptographic roles, and control permission boundaries.</p></div><button class="cta" data-a="new" data-k="users:0">+ Add New User</button></div>
 <div class="app"></div>
 <details class="how"><summary>Activities and process</summary><div class="acts">
 <div class="act"><h3>Add user</h3><ol><li>Enter username, full name and password</li><li>Choose a role</li><li>Click Save user</li></ol></div>
@@ -119,6 +119,7 @@
 </div></details></section>
 <footer class="pf"><div><span>Stockroom | A clear view of what moves.</span><span>Inventory Control System</span></div></footer></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="receipt-modal" hidden aria-modal="true" role="dialog"></div>
 <div id="print-receipt" class="print-only" aria-hidden="true"></div>
 <script src="js/api.js"></script>
 <script src="js/script.js"></script>

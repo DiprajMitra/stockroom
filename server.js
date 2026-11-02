@@ -123,6 +123,8 @@ function mapOraError(e, res) {
   if (/^ORA-20001:\s*403:/.test(m)) { res.status(403).json({ error: clean(m) }); return true; }
   if (/^ORA-20002:\s*400:/.test(m)) { res.status(400).json({ error: clean(m) }); return true; }
   if (/^ORA-01403:.*no data found/.test(m)) { res.status(404).json({ error: 'Not found.' }); return true; }
+  if (/ORA-00001:/.test(m)) { res.status(400).json({ error: 'A record with this name, SKU, or username already exists.' }); return true; }
+  if (/ORA-02292:/.test(m)) { res.status(400).json({ error: 'Cannot delete this record because other records depend on it (e.g. sales, purchases, or catalog items).' }); return true; }
   return false;
 }
 
@@ -208,15 +210,19 @@ app.get('/api/products', async (req, res) => {
       // lower-case in the returned JS keys (Oracle folds unquoted
       // identifiers to upper-case).
       const r = await cn.execute(
-        `SELECT product_id        AS "product_id",
-                name              AS "name",
-                sku               AS "sku",
-                category_id       AS "category_id",
-                unit_price        AS "unit_price",
-                tax_rate_override AS "tax_rate_override",
-                reorder_level     AS "reorder_level",
-                current_stock     AS "current_stock"
-           FROM products ORDER BY name`,
+        `SELECT p.product_id        AS "product_id",
+                p.name              AS "name",
+                p.sku               AS "sku",
+                p.category_id       AS "category_id",
+                c.category_name     AS "category_name",
+                c.default_tax_rate  AS "default_tax_rate",
+                p.unit_price        AS "unit_price",
+                p.tax_rate_override AS "tax_rate_override",
+                p.reorder_level     AS "reorder_level",
+                p.current_stock     AS "current_stock"
+           FROM products p
+           LEFT JOIN categories c ON c.category_id = p.category_id
+          ORDER BY p.name`,
         [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
       return r.rows;
     }));
@@ -452,6 +458,7 @@ app.get('/api/sales', async (req, res) => {
     const rows = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(`
         SELECT s.sale_id AS "id", s.user_id AS "uid",
+               u.full_name AS "cashier",
                TO_CHAR(s.sale_date, 'YYYY-MM-DD') AS "date",
                s.customer_name AS "cust",
                s.order_subtotal AS "sub", s.total_tax AS "tax", s.grand_total AS "total",
@@ -465,13 +472,14 @@ app.get('/api/sales', async (req, res) => {
                  ORDER BY si.sale_item_id
                ) AS "lines_json"
           FROM sales s
+          JOIN users u ON u.user_id = s.user_id
           JOIN sale_items si ON si.sale_id = s.sale_id
           JOIN products   p  ON p.product_id = si.product_id
           JOIN categories c  ON c.category_id = p.category_id
-         GROUP BY s.sale_id, s.user_id, s.sale_date, s.customer_name,
+         GROUP BY s.sale_id, s.user_id, u.full_name, s.sale_date, s.customer_name,
                   s.order_subtotal, s.total_tax, s.grand_total
          ORDER BY s.sale_id`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-      return r.rows.map(x => ({ id: x.id, uid: x.uid, date: x.date, cust: x.cust, sub: x.sub, tax: x.tax, total: x.total, lines: parseJson(x.lines_json) }));
+      return r.rows.map(x => ({ id: x.id, uid: x.uid, cashier: x.cashier, date: x.date, cust: x.cust, sub: x.sub, tax: x.tax, total: x.total, lines: parseJson(x.lines_json) }));
     }));
     res.json(rows);
   } catch (e) { mapOraError(e, res) || res.status(500).json({ error: e.message }); }
@@ -559,13 +567,16 @@ app.get('/api/reports', async (req, res) => {
   try {
     const out = await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       const stock = await cn.execute(`
-        SELECT p.product_id, p.sku, p.name, p.category_id, p.current_stock, p.reorder_level
+        SELECT p.product_id AS "product_id", p.sku AS "sku", p.name AS "name",
+               p.category_id AS "category_id", p.current_stock AS "current_stock",
+               p.reorder_level AS "reorder_level"
           FROM products p
          WHERE :c IS NULL OR TO_CHAR(p.category_id) = :c
          ORDER BY p.name`,
         { c: f.cat || null }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
       const low = await cn.execute(`
-        SELECT product_id, sku, name, current_stock, reorder_level
+        SELECT product_id AS "product_id", sku AS "sku", name AS "name",
+               current_stock AS "current_stock", reorder_level AS "reorder_level"
           FROM products WHERE current_stock <= reorder_level`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
       const out2 = { stockRows: stock.rows, lowRows: low.rows, day: {}, best: {}, tax: {}, includeSales: showSales };
       if (showSales) {
@@ -602,7 +613,7 @@ app.get('/api/users', async (req, res) => {
   try {
     const rows = await withConn(c => setRoleAndRun(c, s.role, async cn => {
       const r = await cn.execute(
-        `SELECT u.user_id AS "id", u.username, u.full_name, r.role_name AS role
+        `SELECT u.user_id AS "id", u.username AS "username", u.full_name AS "full_name", r.role_name AS "role"
            FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.username`,
         [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
       return r.rows;
@@ -610,39 +621,76 @@ app.get('/api/users', async (req, res) => {
     res.json(rows);
   } catch (e) { mapOraError(e, res) || res.status(500).json({ error: e.message }); }
 });
+
 app.post('/api/users', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
   const d = req.body || {};
+  if (!d.username || !d.password || !d.full_name || !d.role) {
+    return res.status(400).json({ error: 'Username, password, full name, and role are required.' });
+  }
+  const cleanUsername = String(d.username).trim().toLowerCase();
+  if (!/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+    return res.status(400).json({ error: 'Username can only contain letters, numbers, underscores, and hyphens.' });
+  }
+  const allowedRoles = ['admin', 'sales_staff', 'inventory_clerk'];
+  if (!allowedRoles.includes(d.role)) {
+    return res.status(400).json({ error: 'Invalid role selected.' });
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       await cn.execute(
         `INSERT INTO users (username, password_hash, full_name, role_id)
          VALUES (:u, :p, :f, (SELECT role_id FROM roles WHERE role_name = :r))`,
-        { u: d.username, p: d.password, f: d.full_name, r: d.role },
+        { u: cleanUsername, p: String(d.password), f: String(d.full_name).trim(), r: d.role },
         { autoCommit: true });
     }));
     res.json({ ok: true });
-  } catch (e) { mapOraError(e, res) || res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (e.message && e.message.includes('ORA-00001')) {
+      return res.status(400).json({ error: `Username "${cleanUsername}" is already taken.` });
+    }
+    mapOraError(e, res) || res.status(500).json({ error: e.message });
+  }
 });
+
 app.patch('/api/users/:id/role', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
+  const targetId = +req.params.id;
+  const role = req.body && req.body.role;
+  const allowedRoles = ['admin', 'sales_staff', 'inventory_clerk'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role.' });
+  }
+  if (targetId === s.user_id && role !== 'admin') {
+    return res.status(400).json({ error: 'Security restriction: You cannot remove your own admin privileges.' });
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
       await cn.execute(
         `UPDATE users SET role_id = (SELECT role_id FROM roles WHERE role_name = :r) WHERE user_id = :id`,
-        { r: req.body.role, id: +req.params.id }, { autoCommit: true });
+        { r: role, id: targetId }, { autoCommit: true });
     }));
     res.json({ ok: true });
   } catch (e) { mapOraError(e, res) || res.status(500).json({ error: e.message }); }
 });
+
 app.delete('/api/users/:id', async (req, res) => {
   const s = requireRole(req, res, ['admin']); if (!s) return;
+  const targetId = +req.params.id;
+  if (targetId === s.user_id) {
+    return res.status(400).json({ error: 'Security restriction: You cannot delete your own logged-in admin account.' });
+  }
   try {
     await withConn(async c => setRoleAndRun(c, s.role, async cn => {
-      await cn.execute(`DELETE FROM users WHERE user_id = :id`, { id: +req.params.id }, { autoCommit: true });
+      await cn.execute(`DELETE FROM users WHERE user_id = :id`, { id: targetId }, { autoCommit: true });
     }));
     res.json({ ok: true });
-  } catch (e) { mapOraError(e, res) || res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (e.message && e.message.includes('ORA-02292')) {
+      return res.status(400).json({ error: 'Cannot delete this user because they have recorded sales, purchases, or catalog records in the system.' });
+    }
+    mapOraError(e, res) || res.status(500).json({ error: e.message });
+  }
 });
 
 // --- Start server --------------------------------------------------------

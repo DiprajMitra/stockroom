@@ -51,11 +51,22 @@
 
   // ----- Overview cache (the server returns a single payload) -----
   let _ovCache = null;
+  let _ovInflight = null;
   async function loadOverview() {
-    if (!_ovCache) _ovCache = await call('GET', '/api/overview');
-    return _ovCache;
+    if (_ovCache) return _ovCache;
+    if (!_ovInflight) {
+      _ovInflight = call('GET', '/api/overview').then(data => {
+        _ovCache = data;
+        _ovInflight = null;
+        return data;
+      }).catch(e => {
+        _ovInflight = null;
+        throw e;
+      });
+    }
+    return _ovInflight;
   }
-  function invalidateOverview() { _ovCache = null; }
+  function invalidateOverview() { _ovCache = null; _ovInflight = null; }
 
   // Public surface - same names the original in-memory api.js exposed,
   // so script.js does not need to change.
@@ -117,11 +128,10 @@
     commitSale: async () => {
       const c = _carts.sales;
       if (!c.items.length) return Promise.reject(new ApiError('Add at least one item first.', 400));
-      // 1) create the sale (synthetic endpoint via direct SQL on the server)
       const newId = await call('POST', '/api/sales', { customer_name: c.customer_name || 'Walk-in', items: c.items });
       _carts.sales = { customer_name: '', items: [] };
       invalidateOverview();
-      return newId;
+      return (newId && newId.id != null) ? newId.id : newId;
     },
     // overview - return the same shape script.js expects
     overviewStats: async () => {
